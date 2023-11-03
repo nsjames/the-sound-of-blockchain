@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+:root {
+    --darkgray:#1E2022;
+}
+
+.gray-container {
+    background: var(--darkgray);
+    padding: 3px;
+    border-radius: 6px;
+}
+
