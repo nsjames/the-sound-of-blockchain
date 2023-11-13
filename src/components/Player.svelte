@@ -10,19 +10,30 @@
         selectedWaveType,
         selectedBlockchain,
         currentTransaction,
-        playing, audioContext, audioOscillator
+        playing, audioContext, audioOscillator, interval
     } from "../stores/store";
     import {onDestroy, onMount} from "svelte";
 
+
+    let MOD = 80;
 
     let context;
     let oscillator;
     let gain;
     let fetchInterval = $selectedBlockchain.fetchInterval;
 
+    let lastFetchTimes = [];
+    let averageFetchTime = 0;
+
     selectedWaveType.subscribe(x => {
         if(oscillator) {
             oscillator.type = x;
+        }
+    });
+
+    volume.subscribe(x => {
+        if(gain) {
+            gain.gain.value = x;
         }
     });
 
@@ -36,7 +47,7 @@
 
 
     let lastKnownBlock = 0;
-    const getTransactionHashes = async () => {
+    const getTransactionIds = async () => {
         if($selectedBlockchain.name === BLOCKCHAINS.eos.name) {
             const block_num = await fetch('https://eos.newdex.one/v1/chain/get_info').then(x => x.json()).then(x => x.fork_db_head_block_num);
             const block = await fetch(`https://eos.greymass.com/v1/chain/get_block`, {
@@ -80,7 +91,7 @@
                     console.log('block.error', block.error);
                     lastKnownBlock = 0;
                 }
-                return getTransactionHashes();
+                return getTransactionIds();
             }
 
             return await Promise.all(block.result.transactions.map(async tx => {
@@ -89,7 +100,6 @@
         }
 
         let rpc = $selectedBlockchain.rpc;
-        console.log('using RPC', rpc);
 
         const block = await fetch(rpc, {
             method: 'POST',
@@ -116,37 +126,52 @@
 
 
         fetcher = setTimeout(async () => {
-            transactions.set(await getTransactionHashes());
-            playTransactions();
+            const timeNow = Date.now();
+            const ids = await Promise.all((await getTransactionIds()).map(async id => {
+                return await sha256(id);
+            }));
+            lastFetchTimes.push(Date.now() - timeNow);
+            if(lastFetchTimes.length > 10) {
+                lastFetchTimes.shift();
+            }
+            averageFetchTime = lastFetchTimes.reduce((a, b) => a + b, 0) / lastFetchTimes.length;
+            transactions.set(ids);
+
             fetchTransactions();
-        }, fetchInterval);
+            playTransactions();
+        }, fetchInterval - averageFetchTime);
     }
+
+
 
     let stopped = false;
 
     const playTransactions = async () => {
-        const waitTime = (fetchInterval*2)/$transactions.length;
+        if(!$transactions.length) return;
+        const waitTime = fetchInterval/$transactions.length;
+        let timeNow = Date.now();
         for(let id of $transactions) {
+            // if(Date.now() - timeNow + waitTime >= fetchInterval) {
+            //     break;
+            // }
+
             if(stopped) break;
 
             currentTransaction.set(id);
-            const hash = await sha256(id);
-            let hashNum = parseInt(Number('0x'+hash).toString());
-            const freq = hashNum*$selectedBlockchain.MOD;
+
+            let hashNum = parseInt(Number('0x'+id).toString());
+            const freq = hashNum*MOD;
             // console.log(freq);
+
             oscillator.frequency.value = freq;
-
-
-
-            gain.gain.value = $volume;
-
             await new Promise(r => setTimeout(r, waitTime))
+
         }
+        console.log('totalTime', Date.now() - timeNow);
     }
 
     onDestroy(() => {
         stopped = true;
-        console.log('unloaded')
         clearTimeout(fetcher);
 
         oscillator.stop();
@@ -156,7 +181,7 @@
     });
 
     onMount(() => {
-        console.log('mounted')
+        console.log('setting new interval')
         context = new AudioContext();
         oscillator = context.createOscillator();
         gain = context.createGain();
@@ -170,6 +195,14 @@
         audioOscillator.set(oscillator);
 
         fetchTransactions();
+
+        // clearInterval($interval);
+        // interval.set(setInterval(() => {
+        //     playTransactions();
+        // }, fetchInterval));
+
+
+
     })
 
 </script>

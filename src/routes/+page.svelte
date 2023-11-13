@@ -9,7 +9,7 @@
             <Speaker />
             <section class="texts">
                 <figure>{$selectedBlockchain.name.toUpperCase()}</figure>
-                <figure><b>{$transactions.length}</b> txs per second</figure>
+                <figure><b>{$transactions.length}</b> txs <span class="text-xs">({$selectedBlockchain.fetchInterval / 1000}s block-time)</span></figure>
                 <figure>{$currentTransaction}</figure>
             </section>
             <Speaker />
@@ -135,9 +135,6 @@
         width: 100vw;
         height: 100vh;
         background: #212129;
-        display: flex;
-        align-content: center;
-        justify-content: center;
         padding: 50px 20px;
     }
 
@@ -146,6 +143,7 @@
         width: 100%;
         border-radius: 6px;
         background: #42474D;
+        margin: 20px auto;
 
         .top-bar {
             width: 800px;

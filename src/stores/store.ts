@@ -11,3 +11,5 @@ export const currentTransaction:Writable<string> = writable('');
 
 export const audioContext:Writable<AudioContext> = writable(null);
 export const audioOscillator:Writable<OscillatorNode> = writable(null);
+
+export const interval:Writable<number> = writable(null);
